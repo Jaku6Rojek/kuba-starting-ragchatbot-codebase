@@ -1,0 +1,368 @@
+<title>RAG Query Flow — Course Materials System</title>
+<meta name="description" content="How a question travels through the tool-based RAG system, from the browser to Claude's agentic search loop and back.">
+<style>
+  :root {
+    --ground: #eef1f4;
+    --card: #ffffff;
+    --ink: #161b26;
+    --muted: #5a6473;
+    --faint: #8a93a1;
+    --hair: #d7dce2;
+    --hair-strong: #c2c9d2;
+    --teal: #0f766e;
+    --teal-soft: #e2f1ef;
+    --orange: #b5470b;
+    --orange-soft: #f8ebe2;
+    --shadow: 0 1px 2px rgba(22,27,38,.06), 0 6px 20px rgba(22,27,38,.05);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+
+  /* Header */
+  header { margin-bottom: 44px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 0 0 12px;
+  }
+  h1 {
+    font-size: clamp(28px, 4.5vw, 40px);
+    line-height: 1.1;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    margin: 0 0 14px;
+    font-weight: 680;
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0;
+  }
+  .lede code { font-family: var(--mono); font-size: .9em; color: var(--ink); }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 28px;
+    margin: 28px 0 0;
+    padding: 16px 20px;
+    background: var(--card);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+  .dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .dot.teal { background: var(--teal); }
+  .dot.orange { background: var(--orange); }
+  .dot.ink { background: var(--ink); }
+
+  /* Flow */
+  .flow { margin-top: 40px; }
+
+  .step {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .rail { display: flex; flex-direction: column; align-items: center; }
+  .num {
+    width: 34px; height: 34px; flex: none;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--mono);
+    font-size: 14px; font-weight: 600;
+    background: var(--ink); color: #fff;
+  }
+  .rail .line {
+    width: 2px; flex: 1 1 auto;
+    background: var(--hair-strong);
+    margin: 6px 0;
+    min-height: 22px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+  }
+  .card .where {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--faint);
+    margin: 0 0 6px;
+  }
+  .card h3 {
+    font-size: 16.5px;
+    margin: 0 0 6px;
+    letter-spacing: -.01em;
+  }
+  .card p { margin: 0; font-size: 14.5px; color: var(--muted); }
+  .card p code, .where + h3 code { font-family: var(--mono); font-size: .88em; color: var(--ink); background: #f1f3f6; padding: 1px 5px; border-radius: 4px; }
+
+  /* The agentic loop block */
+  .loop {
+    border: 1.5px dashed var(--hair-strong);
+    border-radius: 14px;
+    padding: 18px 18px 6px;
+    margin-bottom: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,.4), rgba(238,241,244,.2));
+    position: relative;
+  }
+  .loop-tag {
+    position: absolute;
+    top: -11px; left: 18px;
+    background: var(--ground);
+    padding: 0 10px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .actor {
+    border-left: 3px solid;
+    border-radius: 0 10px 10px 0;
+  }
+  .actor.model { border-left-color: var(--orange); background: linear-gradient(90deg, var(--orange-soft), #fff 60%); }
+  .actor.retrieval { border-left-color: var(--teal); background: linear-gradient(90deg, var(--teal-soft), #fff 60%); }
+  .actor .where { color: inherit; opacity: .75; }
+  .actor.model .where { color: var(--orange); }
+  .actor.retrieval .where { color: var(--teal); }
+
+  /* decision row */
+  .decision {
+    display: flex; align-items: center; gap: 10px;
+    justify-content: center;
+    font-size: 13.5px; color: var(--muted);
+    margin: 2px 0 14px;
+    flex-wrap: wrap;
+  }
+  .branch {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--hair-strong);
+    white-space: nowrap;
+  }
+  .branch.yes { color: var(--teal); border-color: #b7ddd7; background: var(--teal-soft); }
+  .branch.no { color: var(--ink); background: #f1f3f6; }
+
+  .loopback {
+    text-align: center;
+    font-size: 13px;
+    color: var(--orange);
+    font-style: italic;
+    margin: 0 0 12px;
+  }
+
+  /* Vector store panel */
+  .store {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .collection {
+    background: #fff;
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    padding: 13px 15px;
+  }
+  .collection .name {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--teal);
+    font-weight: 600;
+    margin: 0 0 5px;
+  }
+  .collection p { font-size: 13px; }
+  .resolve {
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin: 11px 0 2px;
+    font-family: var(--mono);
+  }
+
+  /* out-of-band note */
+  .aside {
+    grid-column: 2 / 3;
+    margin: -2px 0 14px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: #fbf7ee;
+    border: 1px solid #ecdfc4;
+    font-size: 13.5px;
+    color: #6b5524;
+  }
+  .aside strong { color: #4d3d18; }
+
+  footer {
+    margin-top: 30px;
+    padding-top: 18px;
+    border-top: 1px solid var(--hair);
+    font-size: 13px;
+    color: var(--faint);
+    font-family: var(--mono);
+  }
+
+  @media (max-width: 560px) {
+    .step { grid-template-columns: 34px 1fr; gap: 14px; }
+    .num { width: 28px; height: 28px; font-size: 12px; }
+    .store { grid-template-columns: 1fr; }
+    .aside { grid-column: 1 / 2; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Course Materials RAG · request lifecycle</p>
+    <h1>How one question moves through the system</h1>
+    <p class="lede">A single <code>POST /api/query</code> doesn't just retrieve and answer. Claude is handed a search <em>tool</em> and decides whether to use it — so the interesting work happens in an agentic loop between the model and the vector store.</p>
+    <div class="legend" role="list">
+      <span class="legend-item" role="listitem"><span class="dot ink"></span> Plumbing &amp; orchestration</span>
+      <span class="legend-item" role="listitem"><span class="dot orange"></span> Model — Claude generates / decides</span>
+      <span class="legend-item" role="listitem"><span class="dot teal"></span> Retrieval — vector search</span>
+    </div>
+  </header>
+
+  <div class="flow">
+
+    <!-- 1 -->
+    <div class="step">
+      <div class="rail"><div class="num">1</div><div class="line"></div></div>
+      <div>
+        <div class="card">
+          <p class="where">frontend/script.js</p>
+          <h3>Browser sends the question</h3>
+          <p><code>POST /api/query</code> with <code>{ query, session_id }</code>. The session id is null on the first turn.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="step">
+      <div class="rail"><div class="num">2</div><div class="line"></div></div>
+      <div>
+        <div class="card">
+          <p class="where">backend/app.py · FastAPI</p>
+          <h3>Endpoint creates a session if needed</h3>
+          <p>Mints a session via <code>SessionManager</code> when none was sent, then calls <code>rag_system.query()</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="step">
+      <div class="rail"><div class="num">3</div><div class="line"></div></div>
+      <div>
+        <div class="card">
+          <p class="where">backend/rag_system.py · orchestrator</p>
+          <h3>Assemble history + tools, call the generator</h3>
+          <p>Pulls prior turns from <code>SessionManager</code> and the tool schema from <code>ToolManager</code>, then hands everything to <code>AIGenerator.generate_response()</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 — the loop -->
+    <div class="step">
+      <div class="rail"><div class="num">4</div><div class="line"></div></div>
+      <div>
+        <div class="loop">
+          <span class="loop-tag">agentic loop · ai_generator.py</span>
+
+          <div class="card actor model">
+            <p class="where">Claude call #1 — with tools</p>
+            <h3>The model decides: do I need to search?</h3>
+            <p>System prompt routes the question. General knowledge is answered from the model's own weights; course-specific questions trigger a tool call.</p>
+          </div>
+
+          <div class="decision">
+            <span class="branch no">stop_reason ≠ tool_use → answer directly</span>
+            <span class="branch yes">stop_reason = tool_use → search ↓</span>
+          </div>
+
+          <div class="card actor retrieval">
+            <p class="where">search_tools.py → vector_store.py</p>
+            <h3><code>CourseSearchTool</code> queries ChromaDB</h3>
+            <p>Runs the semantic search (detail below), formats the hits for the model, and stashes UI source labels in <code>self.last_sources</code>.</p>
+          </div>
+
+          <p class="loopback">↑ results appended to the conversation, then Claude is called again <strong>without tools</strong> to write the final answer</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="step">
+      <div class="rail"><div class="num">5</div><div class="line"></div></div>
+      <div>
+        <div class="card">
+          <p class="where">backend/rag_system.py → app.py</p>
+          <h3>Collect sources, save history, respond</h3>
+          <p>Sources are read via <code>get_last_sources()</code> then <code>reset</code>; the exchange is written back to the session. The browser receives <code>{ answer, sources, session_id }</code>.</p>
+        </div>
+        <div class="aside">
+          <strong>Note — sources travel out-of-band.</strong> They never pass through the model's text. The tool records them as a side effect, and the orchestrator picks them up after generation finishes, then clears them for the next query.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Vector store detail -->
+  <div class="step" style="margin-top:8px">
+    <div class="rail"><div class="num" style="background:var(--teal)">▾</div></div>
+    <div>
+      <div class="card" style="border-color:#b7ddd7;">
+        <p class="where" style="color:var(--teal)">vector_store.py · ChromaDB · two collections</p>
+        <h3>Why retrieval is a two-step search</h3>
+        <p>A fuzzy course name is first resolved to its exact title, then used to filter the content. The course title is the unique ID across the whole system.</p>
+        <div class="store">
+          <div class="collection">
+            <p class="name">course_catalog</p>
+            <p>One entry per course. Document = title; metadata holds instructor, links, and lessons (as a <code style="font-family:var(--mono)">lessons_json</code> string).</p>
+          </div>
+          <div class="collection">
+            <p class="name">course_content</p>
+            <p>Chunked lesson text — the embeddings actually searched for relevant passages.</p>
+          </div>
+        </div>
+        <p class="resolve">"MCP" → resolve against catalog → exact title → filter &amp; search content</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>build · uv run uvicorn app:app --reload --port 8000 · :8000</footer>
+</div>
