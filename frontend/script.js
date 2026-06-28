@@ -28,6 +28,9 @@ function setupEventListeners() {
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
     });
+
+    // New chat
+    document.getElementById('newChatButton').addEventListener('click', startNewChat);
     
     
     // Suggested questions
@@ -170,6 +173,18 @@ async function createNewSession() {
     currentSessionId = null;
     chatMessages.innerHTML = '';
     addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+}
+
+async function startNewChat() {
+    const oldSessionId = currentSessionId;
+    if (oldSessionId) {
+        try {
+            await fetch(`${API_URL}/session/${oldSessionId}`, { method: 'DELETE' });
+        } catch (_) {
+            // best-effort backend cleanup; still start a fresh chat locally
+        }
+    }
+    createNewSession();
 }
 
 // Load course statistics
