@@ -9,8 +9,8 @@
 :root {
     --primary-color: #2563eb;
     --primary-hover: #1d4ed8;
-    --background: #4a4d52;
-    --surface: #1e293b;
+    --background: #de5086;
+    --surface: #3c3f7a;
     --surface-hover: #334155;
     --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
@@ -606,6 +606,7 @@ details[open] .suggested-header::before {
 .course-titles {
     margin-top: 0.5rem;
     /* Remove max-height to show all titles without scrolling */
+    counter-reset: course;   /* number the course titles by position */
 }
 
 .course-title-item {
@@ -615,6 +616,40 @@ details[open] .suggested-header::before {
     border-bottom: 1px solid var(--border-color);
     text-transform: none;
     line-height: 1.4;
+}
+
+/* Position number shown at the front of each course title */
+.course-title-item::before {
+    counter-increment: course;
+    content: counter(course) ". ";
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-right: 0.25rem;
+}
+
+/* Lessons listed under each course, each linking to its lesson page */
+.course-lessons {
+    list-style: none;
+    margin: 0.4rem 0 0.15rem 1.1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.course-lessons li {
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.lesson-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+a.lesson-link:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
 }
 
 .course-title-item:last-child {
@@ -638,6 +673,7 @@ details[open] .suggested-header::before {
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.75rem 0;
+    counter-reset: suggested;   /* number the items by position */
 }
 
 .suggested-item {
@@ -651,6 +687,19 @@ details[open] .suggested-header::before {
     transition: all 0.2s ease;
     text-align: left;
     width: 100%;
+}
+
+/* Position number shown at the front of each suggestion */
+.suggested-item::before {
+    counter-increment: suggested;
+    content: counter(suggested) ". ";
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-right: 0.25rem;
+}
+
+.suggested-item:hover::before {
+    color: var(--primary-color);
 }
 
 .suggested-item:focus {

@@ -140,8 +140,27 @@ class RAGSystem:
         return response, sources
     
     def get_course_analytics(self) -> Dict:
-        """Get analytics about the course catalog"""
+        """Get analytics about the course catalog, including per-course lessons + links."""
+        courses = []
+        for meta in self.vector_store.get_all_courses_metadata():
+            lessons = sorted(
+                meta.get("lessons", []),
+                key=lambda l: l.get("lesson_number", 0)
+            )
+            courses.append({
+                "title": meta.get("title"),
+                "course_link": meta.get("course_link"),
+                "lessons": [
+                    {
+                        "number": l.get("lesson_number"),
+                        "title": l.get("lesson_title"),
+                        "link": l.get("lesson_link"),
+                    }
+                    for l in lessons
+                ],
+            })
         return {
             "total_courses": self.vector_store.get_course_count(),
-            "course_titles": self.vector_store.get_existing_course_titles()
+            "course_titles": self.vector_store.get_existing_course_titles(),
+            "courses": courses,
         }

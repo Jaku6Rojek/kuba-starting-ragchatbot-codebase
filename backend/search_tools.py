@@ -100,11 +100,14 @@ class CourseSearchTool(Tool):
                 header += f" - Lesson {lesson_num}"
             header += "]"
             
-            # Track source for the UI (text + optional lesson video link)
+            # Track source for the UI (text + optional lesson/course link)
             source = {"text": course_title, "link": None}
             if lesson_num is not None:
                 source["text"] = f"{course_title} - Lesson {lesson_num}"
                 source["link"] = self.store.get_lesson_link(course_title, lesson_num)
+            else:
+                # Course-only citation: fall back to the course link
+                source["link"] = self.store.get_course_link(course_title)
             sources.append(source)
             
             formatted.append(f"{header}\n{doc}")
