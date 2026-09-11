@@ -167,6 +167,26 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Render one course as a title plus its lessons, each linking to its lesson page
+function renderCourseItem(course) {
+    const lessons = (course.lessons || []).map(lesson => {
+        const label = `Lesson ${lesson.number}${lesson.title ? ': ' + lesson.title : ''}`;
+        if (lesson.link && /^https?:/i.test(lesson.link)) {
+            const a = document.createElement('a');
+            a.href = lesson.link;                 // URL only in href (hidden from view)
+            a.textContent = label;                // visible text is the label, not the URL
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.className = 'lesson-link';
+            return `<li>${a.outerHTML}</li>`;
+        }
+        return `<li><span class="lesson-link">${escapeHtml(label)}</span></li>`;
+    }).join('');
+
+    const lessonsHtml = lessons ? `<ul class="course-lessons">${lessons}</ul>` : '';
+    return `<div class="course-title-item">${escapeHtml(course.title)}${lessonsHtml}</div>`;
+}
+
 // Removed removeMessage function - no longer needed since we handle loading differently
 
 async function createNewSession() {
@@ -202,11 +222,16 @@ async function loadCourseStats() {
             totalCourses.textContent = data.total_courses;
         }
         
-        // Update course titles
+        // Update course titles, each expanded into its lessons (linked)
         if (courseTitles) {
-            if (data.course_titles && data.course_titles.length > 0) {
+            if (data.courses && data.courses.length > 0) {
+                courseTitles.innerHTML = data.courses
+                    .map(course => renderCourseItem(course))
+                    .join('');
+            } else if (data.course_titles && data.course_titles.length > 0) {
+                // Fallback: titles only (no lesson data)
                 courseTitles.innerHTML = data.course_titles
-                    .map(title => `<div class="course-title-item">${title}</div>`)
+                    .map(title => `<div class="course-title-item">${escapeHtml(title)}</div>`)
                     .join('');
             } else {
                 courseTitles.innerHTML = '<span class="no-courses">No courses available</span>';

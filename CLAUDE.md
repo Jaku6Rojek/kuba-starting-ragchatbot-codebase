@@ -43,7 +43,7 @@ A Retrieval-Augmented Generation (RAG) system for answering questions about cour
    ║        └─ stop_reason = tool_use (course-specific)                              ║
    ║                │                                                                ║
    ║                ▼  [R] CourseSearchTool.execute()      search_tools → vector_store║
-   ║                     • semantic search  • stash labels → self.last_sources       ║
+   ║                     • semantic search  • stash {text,link} → self.last_sources  ║
    ║                │ results appended to conversation                               ║
    ║                ▼  [M] Claude call #2 (WITHOUT tools) → final answer             ║
    ╚════════════════════════════════════╪═══════════════════════════════════════════╝
@@ -76,8 +76,12 @@ A rendered HTML version of this diagram lives at `docs/architecture.html`.
 1. `app.py` receives the query, creates a session if needed.
 2. `RAGSystem.query` (`rag_system.py`) is the orchestrator — assembles conversation history, tool definitions, and calls the AI generator.
 3. `AIGenerator.generate_response` calls Claude with tools. If Claude returns `stop_reason == "tool_use"`, it executes the tool(s) via `ToolManager`, appends results, and makes a **second** Claude call **without tools** to produce the final answer. Note: only one search round-trip is supported (the follow-up call has no tools), and the system prompt enforces "one search per query maximum".
-4. `CourseSearchTool.execute` (`search_tools.py`) searches the vector store and stashes UI source labels in `self.last_sources`.
-5. Back in `RAGSystem.query`, sources are pulled via `tool_manager.get_last_sources()` then **reset** — sources flow out-of-band through the tool, not through the model's text response.
+4. `CourseSearchTool.execute` (`search_tools.py`) searches the vector store and stashes UI sources in `self.last_sources` as `{text, link}` dicts — `text` is the `"Course - Lesson N"` label and `link` is the lesson's video URL (looked up via `vector_store.get_lesson_link`), or `None` when there's no lesson.
+5. Back in `RAGSystem.query`, sources are pulled via `tool_manager.get_last_sources()` then **reset** — sources flow out-of-band through the tool, not through the model's text response. `app.py` serializes each into the `Source` Pydantic model (`text` + optional `link`) on `QueryResponse`.
+
+### Other API endpoints
+- `GET /api/courses` → `CourseStats` (`total_courses`, `course_titles`) from `RAGSystem.get_course_analytics` — used by the frontend to show the catalog.
+- `DELETE /api/session/{session_id}` → drops a session's in-memory history via `SessionManager.delete_session`; this backs the frontend's "+ NEW CHAT" button.
 
 ### Vector store (`vector_store.py`, ChromaDB)
 Two separate collections:
