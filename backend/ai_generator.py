@@ -1,9 +1,18 @@
+import logging
 import anthropic
 from typing import List, Optional, Dict, Any
 
+logger = logging.getLogger(__name__)
+
+
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
-    
+
+    # User-facing message returned when the Anthropic API call fails (e.g.
+    # out of credits, rate limited, or an outage). The raw error is logged
+    # server-side rather than leaked to the browser.
+    API_ERROR_MESSAGE = "The assistant is temporarily unavailable. Please try again later."
+
     # Static system prompt to avoid rebuilding on each call
     SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to tools for course information.
 
@@ -84,16 +93,42 @@ Provide only the direct answer to what was asked.
             api_params["tools"] = tools
             api_params["tool_choice"] = {"type": "auto"}
         
-        # Get response from Claude
-        response = self.client.messages.create(**api_params)
-        
-        # Handle tool execution if needed
-        if response.stop_reason == "tool_use" and tool_manager:
-            return self._handle_tool_execution(response, api_params, tool_manager)
-        
-        # Return direct response
-        return response.content[0].text
-    
+        # Get response from Claude. Any API failure (billing, rate limit,
+        # outage) is caught here so the raw error never reaches the user; it
+        # is logged and a friendly message is returned instead.
+        try:
+            response = self.client.messages.create(**api_params)
+
+            # Handle tool execution if needed
+            if response.stop_reason == "tool_use":
+                if tool_manager:
+                    return self._handle_tool_execution(response, api_params, tool_manager)
+                # The model asked to use a tool but no tool_manager was wired
+                # up. We can't run the tool; return whatever text it produced,
+                # or a friendly fallback, instead of crashing on `.text`.
+                logger.warning(
+                    "Model requested tool use but no tool_manager was provided"
+                )
+                return self._extract_text(response) or self.API_ERROR_MESSAGE
+
+            # Return direct response
+            return self._extract_text(response) or self.API_ERROR_MESSAGE
+        except anthropic.APIError:
+            logger.exception("Anthropic API call failed")
+            return self.API_ERROR_MESSAGE
+
+    @staticmethod
+    def _extract_text(response) -> str:
+        """Return the text of the first text block in a response, or ''.
+
+        Robust to responses whose first content block is not text (e.g. a
+        tool_use block), which would otherwise raise AttributeError.
+        """
+        for block in response.content:
+            if getattr(block, "type", None) == "text":
+                return block.text
+        return ""
+
     def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
         """
         Handle execution of tool calls and get follow-up response.
@@ -140,4 +175,4 @@ Provide only the direct answer to what was asked.
         
         # Get final response
         final_response = self.client.messages.create(**final_params)
-        return final_response.content[0].text
+        return self._extract_text(final_response) or self.API_ERROR_MESSAGE
