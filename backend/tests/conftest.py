@@ -99,3 +99,21 @@ def make_tool_use_response():
         return SimpleNamespace(stop_reason="tool_use", content=[block])
 
     return _make
+
+
+@pytest.fixture
+def make_multi_tool_use_response():
+    """Build a fake 'tool_use' response requesting several tool calls at once.
+
+    Accepts an iterable of (tool_name, tool_input, tool_id) tuples and returns a
+    response whose content is one tool_use block per tuple (parallel tool use).
+    """
+
+    def _make(specs):
+        blocks = [
+            SimpleNamespace(type="tool_use", name=name, input=tool_input, id=tool_id)
+            for (name, tool_input, tool_id) in specs
+        ]
+        return SimpleNamespace(stop_reason="tool_use", content=blocks)
+
+    return _make
